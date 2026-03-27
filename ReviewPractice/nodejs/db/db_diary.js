@@ -14,10 +14,12 @@ const diaryTable = sequelize.define('Diary', {
     },
     createdDate: {
         type: DataTypes.DATE,
+        field: 'createdDate',
         allowNull: true,
     },
     emotionId: {
         type: DataTypes.INTEGER,
+        field: 'emotionId',
         allowNull: true,
     },
     content: {

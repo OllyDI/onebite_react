@@ -7,12 +7,10 @@ const cookieParser = require('cookie-parser');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
-require("dotenv").config({ path: "init/init.env" })
-
+// require('dotenv').config();
 const User = require('./db/db_user.js');
 const Diary = require('./db/db_diary.js');
 const isProd = process.env.NODE_ENV === 'production';
-
 
 // JWT 생성
 const createAccessJWT = (user) => jwt.sign(
@@ -29,19 +27,19 @@ const createRefreshJWT = (user) => jwt.sign(
 
 // JWT 발급
 const sendJWTCookies = (res, access, refresh) => {
-    const isProd = process.env.NODE_ENV === 'production';
-    
     res.cookie('access_token', access, {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
+        sameSite: isProd ? 'None' : 'Lax',
         maxAge: 30 * 60 * 1000,
+        path: '/',
     });
     res.cookie('refresh_token', refresh, {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
+        sameSite: isProd ? 'None' : 'Lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/',
     })
 }
 
@@ -53,48 +51,56 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-
 // local register
 app.post('/api/register', async (req, res) => {
-    const { id, pw, name } = req.body;
-
-    if (!id || !pw || !name) {
-        return res.status(400).json({ message: '모든 필드를 입력해주세요' });
+    try {
+        const { id, pw, name } = req.body;
+    
+        if (!id || !pw || !name) {
+            return res.status(400).json({ message: '모든 필드를 입력해주세요' });
+        }
+    
+        const exist = await User.findOne({ where: {id} });
+        if (exist) {
+            return res.status(409).json({ message: '이미 존재하는 ID입니다.' });
+        }
+    
+        const hashed = await bcrypt.hash(pw, 10);
+        await User.create({ id, pw: hashed, name });
+        res.status(201).json({ message: '회원가입이 완료되었습니다.' });
+    } catch (err) {
+        res.status(500).json({ message: '서버 오류' });
     }
-
-    const exist = await User.findOne({ where: {id} });
-    if (exist) {
-        return res.status(409).json({ message: '이미 존재하는 ID입니다.' });
-    }
-
-    const hashed = await bcrypt.hash(pw, 10);
-    await User.create({ id, pw: hashed, name });
-    res.status(201).json({ message: '회원가입이 완료되었습니다.' });
 })
 
 
 // local login
 app.post('/api/login', async (req, res) => {
-    const {id, pw} = req.body;
-
-    if (!id || !pw) {
-        return res.status(400).json({ message: '아이디 또는 비밀번호 확인을 확인하세요.' });
+    try { 
+        const {id, pw} = req.body;
+    
+        if (!id || !pw) {
+            return res.status(400).json({ message: '아이디 또는 비밀번호 확인을 확인하세요.' });
+        }
+    
+        const user = await User.findOne({ where: {id} });
+        if (!user) return res.status(401).json({ message: '아이디가 존재하지 않습니다.' });
+    
+        const ok = await bcrypt.compare(pw, user.pw);
+        if (!ok) return res.status(401).json({ message: '비밀번호가 불일치합니다.' });
+    
+        const accessToken = createAccessJWT(user);
+        const refreshToken = createRefreshJWT(user);
+    
+        user.refresh_jwt = refreshToken;
+        await user.save();
+    
+        sendJWTCookies(res, accessToken, refreshToken);
+        res.status(200).send('success');
+    } catch (err) {
+        console.log('login err', err);
+        res.status(500).json({ message: '서버 오류' })
     }
-
-    const user = await User.findOne({ where: {id} });
-    if (!user) return res.status(401).json({ message: '아이디가 존재하지 않습니다.' });
-
-    const ok = await bcrypt.compare(pw, user.pw);
-    if (!ok) return res.status(401).json({ message: '비밀번호가 불일치합니다.' });
-
-    const accessToken = createAccessJWT(user);
-    const refreshToken = createRefreshJWT(user);
-
-    user.refresh_jwt = refreshToken;
-    await user.save();
-
-    sendJWTCookies(res, accessToken, refreshToken);
-    res.status(200).send('success');
 })
 
 
@@ -162,7 +168,7 @@ app.post('/api/logout', async (req, res) => {
         try {
             const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
             const user = await User.findOne({
-                where: id.payload.id
+                where: { id: payload.id },
             });
             if (user) {
                 user.refresh_jwt = null;
@@ -170,9 +176,18 @@ app.post('/api/logout', async (req, res) => {
             }
         } catch (err) {}
     }
-
-    res.clearCookie('access_token', { httpOnly:true, sameSite: isProd ? 'none' : 'lax'})
-    res.clearCookie('refresh_token', { httpOnly:true, sameSite: isProd ? 'none' : 'lax'})
+    res.clearCookie('access_token', { 
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? 'None' : 'Lax',
+        path: '/',
+    })
+    res.clearCookie('refresh_token', { 
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? 'None' : 'Lax',
+        path: '/',
+    })
     res.json({ message: '로그아웃 성공' });
 })
 

@@ -1,6 +1,5 @@
 import Header from '../components/Header'
-import Button from '../components/Button'
-import UserRegister from '../components/userRegister'
+import UserRegister from '../components/UserRegister'
 import { useNavigate } from 'react-router-dom'
 
 const Register = () => {
