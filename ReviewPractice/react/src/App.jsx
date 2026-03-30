@@ -1,4 +1,4 @@
-import { useReducer, useRef, createContext, useEffect, useState } from 'react'
+import { useReducer, createContext, useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { api } from './util/api'
 import { UserContext } from './util/UserContext'
@@ -22,9 +22,6 @@ function reducer(state, action) {
     }
     case 'CREATE': {
       nextState = [...state, action.data];
-      api.post('/api/create_diary', action.data, { withCredentials: true })
-      .then(res => alert(res.data.message))
-      .catch(err => alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.'));
       break;
     } 
     case 'UPDATE': {
@@ -33,21 +30,15 @@ function reducer(state, action) {
         ? action.data 
         : item
       );
-      api.post('/api/update_diary', action.data, { withCredentials: true })
-      .then(res => alert(res.data.message))
-      .catch(err => alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.'));
       break;
     } 
     case 'DELETE': {
       nextState = state.filter((item) => String(item.id) !== String(action.id));
-      api.post('/api/delete_diary', { id: action.id }, { withCredentials: true })
-      .then(res => alert(res.data.message))
-      .catch(err => alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.'));
       break;
     } 
     default: return state;
   }
-  localStorage.setItem('diary', JSON.stringify(nextState));
+  // localStorage.setItem('diary', JSON.stringify(nextState));
   return nextState;
 }
 
@@ -58,7 +49,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [data, dispatch] = useReducer(reducer, []);
   const [user, setUser] = useState(null);
-  const idRef = useRef(0);
 
 
   useEffect(() => {
@@ -68,7 +58,7 @@ function App() {
     } 
     const init = async () => {
       try {
-        const diaries = await api.post('/api/diary', {id: user.user_id}, { withCredentials: true });
+        const diaries = await api.post('/api/diary', {id: user.user_id});
         const tmpDiaries = diaries.data.diaries;
         let maxId = 0;
 
@@ -76,7 +66,6 @@ function App() {
           if (Number(item.id) > maxId) { maxId = Number(item.id) }
           item.createdDate = new Date(item.createdDate).getTime();
         })
-        idRef.current = maxId + 1;
 
         dispatch({
           type: 'INIT',
@@ -92,21 +81,45 @@ function App() {
   }, [user])
 
   // 일기 추가
-  const onCreate = (createdDate, emotionId, content, user_id) => {
-    dispatch({
+  const onCreate = async (createdDate, emotionId, content, user_id) => {
+
+    try {
+      const res = await api.post('/api/create_diary', {
+        createdDate,
+        emotionId,
+        content,
+        user_id
+      })
+
+      dispatch({
       type: 'CREATE',
       data: {
-        id: idRef.current++,
         createdDate,
         emotionId,
         content,
         user_id
       }
     })
+
+    alert(res.data.message);
+    } catch (err) {
+      alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.');
+    }
   }
+  
   // 일기 수정
-  const onUpdate = (id, createdDate, emotionId, content, user_id) => {
-    dispatch({
+  const onUpdate = async (id, createdDate, emotionId, content, user_id) => {
+
+    try {
+      const res = await api.post('/api/update_diary', {
+        id,
+        createdDate,
+        emotionId,
+        content,
+        user_id
+      })
+
+      dispatch({
       type: 'UPDATE',
       data: {
         id,
@@ -116,13 +129,27 @@ function App() {
         user_id
       }
     })
+
+    alert(res.data.message)
+    } catch (err) {
+      alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.')
+    }
   }
+
   // 일기 삭제
-  const onDelete = (id) => {
-    dispatch({
-      type: 'DELETE',
-      id
-    })
+  const onDelete = async (id) => {
+
+    try {
+      const res = await api.post('/api/delete_diary', { id: id })
+      dispatch({
+        type: 'DELETE',
+        id
+      })
+      
+      alert(res.data.message)
+    } catch (err) {
+      alert(err.response?.data?.message || '알 수 없는 오류가 발생했습니다.')
+    }
   }
 
   if (isLoading) {

@@ -16,6 +16,9 @@ const DiaryList = ({data}) => {
         try {
             if (window.confirm('로그아웃 하시겠습니까?')) {
                 await api.post('/api/logout');
+
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
                 setUser(null);
                 nav('/login');
             }

@@ -6,7 +6,7 @@ const diaryTable = sequelize.define('Diary', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
-        allowNull: true,
+        autoIncrement: true,
     },
     user_id: {
         type: DataTypes.INTEGER,

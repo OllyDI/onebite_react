@@ -4,6 +4,8 @@ import Button from "./Button"
 import { api } from '../util/api'
 import './UserLogin.css'
 
+
+
 const UserLogin = () => {
 
     const [userInfo, setUserInfo] = useState({
@@ -12,11 +14,24 @@ const UserLogin = () => {
     })
     const nav = useNavigate();
 
+    const isMobile = () => {
+        return /android|iphone|ipad|ipod/i.test(
+            navigator.userAgent
+        );
+    }
+
     const onClickLogin = async (e) => {
         e.preventDefault();
 
         try {
-            await api.post('/api/login', userInfo);
+            const res = await api.post('/api/login', userInfo);
+
+            if (isMobile()) {
+                const { accessToken, refreshToken } = res.data;
+
+                localStorage.setItem('accessToken', accessToken);
+                localStorage.setItem('refreshToken', refreshToken);
+            }
             nav('/');
         } catch (err) {
             alert(err.response?.data?.message || '로그인 실패');

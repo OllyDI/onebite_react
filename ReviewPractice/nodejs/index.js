@@ -12,6 +12,10 @@ const User = require('./db/db_user.js');
 const Diary = require('./db/db_diary.js');
 const isProd = process.env.NODE_ENV === 'production';
 
+
+
+
+
 // JWT 생성
 const createAccessJWT = (user) => jwt.sign(
     { id: user.id },
@@ -26,7 +30,22 @@ const createRefreshJWT = (user) => jwt.sign(
 
 
 // JWT 발급
-const sendJWTCookies = (res, access, refresh) => {
+const sendJWTCookies = (req, res, access, refresh) => {
+
+    const isMobile = (req) => {
+        const ua = req.headers['user-agent'] || '';
+        return /android|iphone|ipad|ipod/i.test(ua);
+    }
+
+    // mobile: jwt 토큰
+    if (isMobile(req)) {
+        return res.json({ 
+            accessToken: access,
+            refreshToken: refresh
+         })
+    }
+
+    // pc: jwt 쿠키, 세션
     res.cookie('access_token', access, {
         httpOnly: true,
         secure: isProd,
@@ -41,6 +60,8 @@ const sendJWTCookies = (res, access, refresh) => {
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
     })
+
+    return res.json({ message: 'success' })
 }
 
 
@@ -95,8 +116,7 @@ app.post('/api/login', async (req, res) => {
         user.refresh_jwt = refreshToken;
         await user.save();
     
-        sendJWTCookies(res, accessToken, refreshToken);
-        res.status(200).send('success');
+        return sendJWTCookies(req, res, accessToken, refreshToken);
     } catch (err) {
         console.log('login err', err);
         res.status(500).json({ message: '서버 오류' })
@@ -106,7 +126,20 @@ app.post('/api/login', async (req, res) => {
 
 // JWT authenticate
 const authMiddleware = (req, res, next) => {
-    const token = req.cookies.access_token; 
+    let token = null;
+
+    // mobile
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    }
+    
+    // pc
+    if (!token) {
+        token = req.cookies.access_token;
+    }
+
     if (!token) {
         return res.status(401).json({ message: '토큰이 존재하지 않습니다.' });
     }
@@ -134,8 +167,15 @@ app.get('/api/me', authMiddleware, async (req, res) => {
 
 // JWT refresh
 app.post('/api/refresh', async (req, res) => {
-    const token = req.cookies.refresh_token;
+    let token = req.cookies.refresh_token;
+
     if (!token) {
+        const authHeader = req.headers.authorization;
+
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        }
+
         return res.status(401).json({ message: '리프레시 토큰이 없습니다.' })
     }
 
@@ -153,8 +193,7 @@ app.post('/api/refresh', async (req, res) => {
         user.refresh_jwt = newRefresh;
         await user.save();
 
-        sendJWTCookies(res, newAccess, newRefresh);
-        res.json({ message: '토큰 갱신 완료' });
+        return sendJWTCookies(req, res, newAccess, newRefresh);
     } catch (err) {
         return res.status(403).json({ massage: '리프레시에 실패했습니다.' });
     }
