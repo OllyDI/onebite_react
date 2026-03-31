@@ -29,7 +29,7 @@
 <ul>
   <li>로그인 및 회원가입 구현</li>
   <li>Node.js 서버와 연동</li>
-  <li>MySQL과 연동</li>
+  <li>SUPABASE와 연동</li>
   <li>PC - 쿠키, 세션 방식 사용</li>
   <li>모바일 - JWT 토큰 방식 사용</li>
 </ul>
