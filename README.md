@@ -68,7 +68,8 @@
   <ul>
     <li>
       <h4>DB 설계</h4>
-      <img width="704" height="246" alt="Image" src="https://github.com/user-attachments/assets/f8cd7123-2450-4854-80b5-1f7b4a5ac9a0" />
+      <img width="869" height="411" alt="Image" src="https://github.com/user-attachments/assets/2fa15a88-4adb-4c4f-b7ab-e667ba35e753" />
+      <!-- <img width="704" height="246" alt="Image" src="https://github.com/user-attachments/assets/f8cd7123-2450-4854-80b5-1f7b4a5ac9a0" /> -->
     </li>
     <li>
       <h4>로그인 및 회원가입</h4>
