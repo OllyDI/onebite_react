@@ -18,12 +18,12 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // JWT 생성
 const createAccessJWT = (user) => jwt.sign(
-    { id: user.id },
+    { user_id: user.user_id },
     process.env.JWT_ACCESS_SECRET,
     { expiresIn: '30m' }
 )
 const createRefreshJWT = (user) => jwt.sign(
-    { id: user.id },
+    { user_id: user.user_id },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: '7d' }
 )
@@ -146,7 +146,7 @@ const authMiddleware = (req, res, next) => {
 
     try {
         const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-        req.userId = payload.id;
+        req.userId = payload.user_id;
         next();
     } catch (err) {
         return res.status(401).json({ message: '토큰이 만료되었거나 유효하지 않습니다.' })
@@ -157,7 +157,7 @@ const authMiddleware = (req, res, next) => {
 // 로그인 정보 가져오기
 app.get('/api/me', authMiddleware, async (req, res) => {
     const user = await User.findOne({
-        where: { id: req.userId },
+        where: { user_id: req.userId },
         attributes: ['user_id', 'name', 'created_at']
     });
 
@@ -175,14 +175,16 @@ app.post('/api/refresh', async (req, res) => {
         if (authHeader && authHeader.startsWith('Bearer ')) {
             token = authHeader.split(' ')[1];
         }
+    }
 
+    if (!token) {
         return res.status(401).json({ message: '리프레시 토큰이 없습니다.' })
     }
 
     try {
         const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
         const user = await User.findOne({ 
-            where: { id: payload.id }
+            where: { user_id: payload.user_id }
         });
         if (!user || user.refresh_jwt !== token) {
             return res.status(403).json({ message: '리프레시 토큰이 유효하지 안습니다.' })
@@ -195,7 +197,7 @@ app.post('/api/refresh', async (req, res) => {
 
         return sendJWTCookies(req, res, newAccess, newRefresh);
     } catch (err) {
-        return res.status(403).json({ massage: '리프레시에 실패했습니다.' });
+        return res.status(403).json({ message: '리프레시에 실패했습니다.' });
     }
 })
 
@@ -207,7 +209,7 @@ app.post('/api/logout', async (req, res) => {
         try {
             const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
             const user = await User.findOne({
-                where: { id: payload.id },
+                where: { user_id: payload.user_id },
             });
             if (user) {
                 user.refresh_jwt = null;
@@ -232,8 +234,9 @@ app.post('/api/logout', async (req, res) => {
 
 
 // 회원 다이어리 가져오기
-app.post('/api/diary', async (req, res) => {
-    const id = req.body.id;
+app.post('/api/diary', authMiddleware, async (req, res) => {
+    const id = req.userId;
+
     try {
         const diaries = await Diary.findAll({
             where: { user_id: id }
@@ -247,8 +250,9 @@ app.post('/api/diary', async (req, res) => {
 
 
 // 다이어리 생성
-app.post('/api/create_diary', async (req, res) => {
-    const diary = req.body;
+app.post('/api/create_diary', authMiddleware, async (req, res) => {
+    const { createdDate, emotionId, content } = req.body;
+    const diary = { createdDate, emotionId, content, user_id: req.userId };
 
     try {
         await Diary.create(diary);
@@ -261,32 +265,41 @@ app.post('/api/create_diary', async (req, res) => {
 
 
 // 다이어리 수정
-app.post('/api/update_diary', async (req, res) => {
-    const diary = req.body;
-    const {id} = req.body;
+app.post('/api/update_diary', authMiddleware, async (req, res) => {
+    const { id, createdDate, emotionId, content } = req.body;
 
     try {
-        await Diary.update(diary, { 
-            where: { id: id } 
-        });
+        const [updatedCount] = await Diary.update(
+            { createdDate, emotionId, content }, 
+            { where: { id, user_id: req.userId } }
+        );
+        if (updatedCount === 0) {
+            return res.status(404).json({ message: '수정할 다이어리가 없습니다.' });
+        }
         res.status(200).json({ message: '업데이트가 완료되었습니다.' })
     } catch (err) {
-        console.error('diary create error', err);
+        console.error('diary update error', err);
         res.status(500).json({ message: '데이터 업데이트에 실패했습니다. '})
     }
 })
 
 
 // 다이어리 삭제
-app.post('/api/delete_diary', async (req, res) => {
+app.post('/api/delete_diary', authMiddleware, async (req, res) => {
     const id = req.body.id;
     try {
-        await Diary.destroy({ 
-            where: { id: id } 
+        const deletedCount = await Diary.destroy({ 
+            where: { 
+                id: id,
+                user_id: req.userId
+            } 
         });
+        if (deletedCount === 0) {
+            return res.status(404).json({ message: '삭제할 다이어리가 없습니다.' });
+        }
         res.status(200).json({ message: '삭제가 완료되었습니다.' })
     } catch (err) {
-        console.error('diary create error', err);
+        console.error('diary delete error', err);
         res.status(500).json({ message: '데이터 삭제에 실패했습니다. '})
     }
 })
